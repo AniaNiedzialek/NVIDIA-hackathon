@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from data.student_data import get_student, get_degree_requirements, get_f1_requirements, get_student_context, Student
+from data.knowledge_base import get_personalized_answer, get_quick_facts
 from agents import route_question, handle_registrar_question, handle_career_question, handle_compliance_question
 from utils.nvidia_client import chat
 
@@ -211,63 +212,24 @@ def show_f1_status(student: Student):
 def show_ai_assistant(student: Student):
     st.subheader("💬 Ask Your Personal AI Counselor")
     
-    student_context = get_student_context(student)
+    quick_facts = get_quick_facts(student)
+    st.info(quick_facts)
     
-    system_prompt = f"""You are a highly personalized SJSU AI Counselor for {student.first_name} {student.last_name}.
-
-IMPORTANT: You have access to {student.first_name}'s EXACT academic record below. Use this information to provide SPECIFIC, PERSONALIZED answers - not generic information.
-
-{student_context}
-
-RESPONSE GUIDELINES:
-1. Always reference their SPECIFIC courses, grades, and progress when answering
-2. If they ask about graduation, calculate their EXACT remaining units based on their record
-3. If they ask about F-1 requirements, use their CURRENT enrolled units
-4. For appointments, suggest SPECIFIC times and include their name/ID
-5. If they ask about requirements, show what they've completed vs what's remaining
-6. Be actionable - help them plan next steps with THEIR specific data
-
-When recommending courses, only suggest ones from their remaining courses list.
-When discussing graduation, calculate exact units needed based on their completed + in-progress units.
-"""
-
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
     
-    if prompt := st.chat_input("Ask about YOUR courses, graduation, F-1 status, appointments..."):
+    if prompt := st.chat_input("Ask about YOUR courses, graduation, F-1 status, advisor..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         
         with st.chat_message("user"):
             st.markdown(prompt)
         
         with st.chat_message("assistant"):
-            with st.spinner("Analyzing YOUR academic record..."):
-                route = route_question(prompt)
-                st.caption(f"🤖 Routing: {route['agent'].upper()}")
-                
-                full_messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ]
-                
-                if route["agent"] == "registrar":
-                    response = handle_registrar_question(prompt, stream=True)
-                elif route["agent"] == "career":
-                    response = handle_career_question(prompt, stream=True)
-                elif route["agent"] == "compliance":
-                    response = handle_compliance_question(prompt, stream=True)
-                else:
-                    response = chat(full_messages)
-                    response = [{"type": "content", "content": response}]
-                
-                result_container = st.empty()
-                full_response = ""
-                
-                for chunk in response:
-                    if chunk.get("type") == "content":
-                        full_response += chunk["content"]
-                        result_container.markdown(full_response)
+            with st.spinner("Looking up YOUR specific information..."):
+                response = get_personalized_answer(student, prompt)
+                st.markdown(response)
+                full_response = response
         
         st.session_state.messages.append({"role": "assistant", "content": full_response})
 
