@@ -4,6 +4,11 @@ from data.student_data import get_student, get_degree_requirements, get_f1_requi
 from data.knowledge_base import get_personalized_answer, get_quick_facts
 from agents import route_question, handle_registrar_question, handle_career_question, handle_compliance_question
 from utils.nvidia_client import chat
+from professor_views import (
+    render_professor_login,
+    render_professor_dashboard,
+    render_course_management,
+)
 
 st.set_page_config(page_title="🎓 SJSU AI Counselor", page_icon="🎓", layout="wide")
 
@@ -11,10 +16,40 @@ if "student" not in st.session_state:
     st.session_state.student = None
 if "messages" not in st.session_state:
     st.session_state.messages = []
+# Portal: None = landing, "student" = student login, "professor" = professor flow
+if "portal" not in st.session_state:
+    st.session_state.portal = None
+
+def landing_section():
+    """Choose Student or Professor portal (hackathon: both in one app)."""
+    st.markdown("""
+    <div style="text-align: center; padding: 40px 0 30px 0;">
+        <h1>🎓 SJSU Assistant</h1>
+        <p style="font-size: 18px; color: #555;">Student counseling & professor course management</p>
+    </div>
+    """, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("### Choose your portal")
+        a, b = st.columns(2)
+        with a:
+            if st.button("🎓 **Student Login**", use_container_width=True, type="primary"):
+                st.session_state.portal = "student"
+                st.rerun()
+        with b:
+            if st.button("👩‍🏫 **Professor Portal**", use_container_width=True):
+                st.session_state.portal = "professor"
+                st.rerun()
+        st.caption("Students: AI counselor, degree progress, F-1 status. Professors: waitlist & permission codes.")
+
 
 def login_section():
+    # Back to landing
+    if st.button("← Back"):
+        st.session_state.portal = None
+        st.rerun()
     st.markdown("""
-    <div style="text-align: center; padding: 50px;">
+    <div style="text-align: center; padding: 30px 0 20px 0;">
         <h1>🎓 Welcome to SJSU AI Counselor</h1>
         <p style="font-size: 18px; color: #666;">Your personal AI assistant for navigating SJSU</p>
     </div>
@@ -234,7 +269,22 @@ def show_ai_assistant(student: Student):
         st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 if __name__ == "__main__":
+    # Student logged in: show student dashboard
     if st.session_state.student:
         show_dashboard(st.session_state.student)
-    else:
+    # Professor portal flow
+    elif st.session_state.portal == "professor":
+        if "professor_page" not in st.session_state:
+            st.session_state.professor_page = "login"
+        if st.session_state.professor_page == "login":
+            render_professor_login()
+        elif st.session_state.professor_page == "dashboard":
+            render_professor_dashboard()
+        else:
+            render_course_management()
+    # Student portal: show student login
+    elif st.session_state.portal == "student":
         login_section()
+    # Landing: choose Student or Professor
+    else:
+        landing_section()
